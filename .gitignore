@@ -1,0 +1,10 @@
+# local tool settings
+.claude/
+
+# dataset (download from Roboflow, see README)
+Abnormal Behavior Detection*/
+*.zip
+
+# python / jupyter
+__pycache__/
+.ipynb_checkpoints/
