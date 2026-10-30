@@ -6,7 +6,7 @@ A deep learning mini project that detects **abnormal behavior in surveillance fo
 |---|---|---|---|---|
 | **2D CNN** | Single frames | Spatial appearance (pose, scene) | ✅ Done | [`2d-cnn`](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn) |
 | **3D CNN** | Short clips (stacks of frames) | Spatial + short-range motion | 🔜 Planned | – |
-| **Transformer** | Frames or clips as token sequences | Long-range spatial / temporal relations | 🔜 Planned | – |
+| **Transformer** | Single frames as patch tokens | Global spatial relations (self-attention) | ✅ Done | [`transformer`](https://github.com/anikagupta2403/DL-proj/tree/transformer) |
 
 Each model lives on its own branch with its notebooks, trained weights and a detailed README. `main` holds this overview.
 
@@ -58,9 +58,25 @@ Both models detect every fall and fight in the test set (784 frames); all of the
 
 The model convolves over both space and time on short clips of consecutive frames, so it can learn **motion** (collapsing, striking, scattering) instead of single-frame appearance.
 
-### 3. Transformer (planned)
+### 3. Transformer (done)
 
-The model uses self-attention over image patches and/or frame sequences to capture long-range relationships across the scene and over time.
+An ImageNet-pretrained **ViT-B/16** fine-tuned on the same split as the 2D CNNs. Each frame is cut into 196 patches of 16×16 pixels, and 12 self-attention layers relate every patch to every other.
+
+| Variant | Params | Test accuracy | Test macro-F1 |
+|---|---|---|---|
+| ViT-B/16 (ImageNet-pretrained, fine-tuned) | 85.80 M | 0.985 | 0.987 |
+
+ViT comes close to ResNet-18 but does not beat it, despite almost 8× more parameters. It makes a different kind of error: it has the fewest false alarms (3), but it is the only model that misses falls (9 falls predicted as normal). Details are in the [`transformer` branch README](https://github.com/anikagupta2403/DL-proj/tree/transformer).
+
+### Results so far
+
+| Model | Params | Test accuracy | Test macro-F1 | Fall recall | Normal recall |
+|---|---|---|---|---|---|
+| ResNet-18 | 11.18 M | **0.992** | **0.994** | 1.000 | 0.983 |
+| Custom CNN | 1.17 M | 0.969 | 0.969 | 1.000 | 0.932 |
+| ViT-B/16 | 85.80 M | 0.985 | 0.987 | 0.969 | **0.992** |
+
+All three use the same 784-frame test split, so differences of a few frames are within noise.
 
 ---
 
@@ -78,7 +94,7 @@ The model uses self-attention over image patches and/or frame sequences to captu
 main      ← project overview (this README)
 2d-cnn    ← 2D CNN notebooks, trained weights, results, detailed README
 3d-cnn    ← (planned)
-transformer ← (planned)
+transformer ← ViT-B/16 notebook, results, detailed README
 ```
 
 All training runs on **Kaggle (GPU)**. Each branch's README explains how to reproduce its results.
