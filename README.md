@@ -99,6 +99,16 @@ Confusion matrix (rows = true, columns = predicted): fall 279 / 0 / 9, fight 0 /
 
 ---
 
+### Graphs
+
+The same set of graphs as the 3D CNN branch. The dashed line marks epoch 8, whose weights were kept for testing. The notebook logged only training loss per epoch (no validation loss) and only validation macro-F1 (no training F1), so those curves have a single line.
+
+| | |
+|---|---|
+| ![ViT-B/16 loss curve](results/vit_loss_curve.png) | ![ViT-B/16 accuracy curve](results/vit_accuracy_curve.png) |
+| ![ViT-B/16 macro-F1 curve](results/vit_macro_f1_curve.png) | ![ViT-B/16 test confusion matrix](results/vit_test_confusion_matrix.png) |
+| ![ViT-B/16 per-class test metrics](results/vit_test_class_metrics.png) | |
+
 ## 3. Comparison with the 2D CNNs
 
 | | ViT-B/16 | ResNet-18 | Custom CNN |
