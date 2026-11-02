@@ -101,7 +101,7 @@ Confusion matrix (rows = true, columns = predicted): fall 279 / 0 / 9, fight 0 /
 
 ### Graphs
 
-The same set of graphs as the 3D CNN branch. The dashed line marks epoch 8, whose weights were kept for testing. The notebook logged only training loss per epoch (no validation loss) and only validation macro-F1 (no training F1), so those curves have a single line.
+The dashed line marks epoch 8, whose weights were kept for testing. The notebook logged only training loss per epoch (no validation loss) and only validation macro-F1 (no training F1), so those curves have a single line.
 
 | | |
 |---|---|
