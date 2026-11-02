@@ -140,6 +140,16 @@ The one error in this sample (top row, 4th) is a person **standing** next to the
 
 ---
 
+### Graphs
+
+The same set of graphs as the 3D CNN branch. The dashed line marks epoch 9, whose weights were kept for testing. The notebook logged only training loss per epoch (no validation loss) and only validation macro-F1 (no training F1), so those curves have a single line.
+
+| | |
+|---|---|
+| ![ResNet-18 loss curve](results/resnet18_loss_curve.png) | ![ResNet-18 accuracy curve](results/resnet18_accuracy_curve.png) |
+| ![ResNet-18 macro-F1 curve](results/resnet18_macro_f1_curve.png) | ![ResNet-18 test confusion matrix](results/resnet18_test_confusion_matrix.png) |
+| ![ResNet-18 per-class test metrics](results/resnet18_test_class_metrics.png) | |
+
 ## 3. Comparison with the other models
 
 All four models are tested on the same held-out videos. The 2D models are scored on the same 784 test frames; the 3D CNN on 84 clips from the test videos with usable filenames.
