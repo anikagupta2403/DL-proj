@@ -131,7 +131,7 @@ The same set of graphs as the 3D CNN branch. The dashed line marks epoch 8, whos
 
 ## 4. Limitations
 
-- **Same dataset limits as the CNNs:** no crowd panic class, and the scene can give away the class (falls come from a few indoor rooms, fights from outdoor scenes). See the [`2d-cnn` README](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn#4-limitations).
+- **Same dataset limits as the CNNs:** the scene can give away the class (falls come from a few indoor rooms, fights from outdoor scenes). See the [`2d-cnn` README](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn#5-limitations).
 - **Small, uneven test split.** The gap between ViT and ResNet-18 is 6 images, which is within what a different split could change.
 - **No temporal information.** Like the 2D CNNs, the ViT sees one frame at a time. A video transformer would need ordered clips, which this dataset mostly lacks.
 - **Heavy model.** At 343 MB and 85.8M parameters, it is much slower and larger than ResNet-18 for a slightly lower score.
