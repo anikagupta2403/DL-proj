@@ -197,10 +197,9 @@ The model is evaluated on the group-aware test split (784 images, the same as Re
 
 ## 5. Limitations
 
-- **The dataset has no crowd panic class.** It covers falls and fights, which are individual or small-group abnormal behaviors. The models detect *abnormal behavior* in general, and a dedicated crowd panic dataset (e.g. UMN, or the escape scenes in ShanghaiTech) would be needed for that specific task.
 - **Scene can give away the class.** Most fall frames come from a few indoor rooms and most fight frames from outdoor scenes, so a CNN can partly rely on the background instead of the behavior. The group split prevents identical clips from leaking across splits, but scenes still repeat across clips (e.g. the UR Fall room shared by many videos). The error in the sample predictions, a person standing in a fall room predicted as *fall* (ResNet-18 makes the same one), is an example of this. This may explain why even a small from-scratch CNN does so well. The scores should not be read as proof that the models generalize to new cameras.
 - **Small, uneven test split.** The test split has only 141 fight frames, from a limited number of videos, so per-class scores can change by a few points with a different split.
-- **No temporal information.** A 2D CNN sees one frame at a time, while panic, fights and falls are defined by motion.
+- **No temporal information.** A 2D CNN sees one frame at a time, while fights and falls are defined by motion.
 
 ---
 
