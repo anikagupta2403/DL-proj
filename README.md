@@ -154,7 +154,7 @@ Confusion matrix (rows = true, columns = predicted): normal 18 / 9 / 1, fall 0 /
 - **Very small evaluation sets.** Validation has 5 normal clips and test has 84 clips, so a single clip changes test accuracy by 1.2 points. Picking the best epoch on this validation set is noisy.
 - **Sparse, irregular frames.** Roboflow kept only some frames of each video, so a "clip" can span up to 60 frame numbers. That is not smooth video, which limits what a 3D CNN can learn from motion.
 - **Fewer videos than the 2D models.** 1,640 images without a video name are not used at all.
-- **No crowd panic class**, and the scene can give away the class (falls come from a few indoor rooms, fights from outdoor scenes). See the [`2d-cnn` README](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn).
+- **The scene can give away the class** (falls come from a few indoor rooms, fights from outdoor scenes). See the [`2d-cnn` README](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn).
 - **Frame label = clip label.** Clips with mixed labels are skipped, so the moment of transition (normal → fall) is never seen in training. That is exactly where the test errors are.
 
 **Possible improvements:** score the 2D models on the same 336 test frames for an exact comparison; use a video-pretrained backbone (e.g. torchvision `r3d_18` on Kinetics-400); pick the checkpoint by validation loss or average the last few epochs instead of the noisy macro-F1.
