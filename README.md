@@ -1,14 +1,15 @@
 # Abnormal Crowd Behavior Detection
 
-A deep learning mini project that detects **abnormal behavior in surveillance footage**: classifying scenes as **normal**, **fall** or **fight**. We compare three model families that see the data differently:
+A deep learning mini project that detects **abnormal behavior in surveillance footage**: classifying scenes as **normal**, **fall** or **fight**. We compare three model families (2D CNN, 3D CNN and Transformer) that see the data differently, with four trained models:
 
-| Model | Input | Captures | Status | Branch |
+| Model | Family | Input | Captures | Branch |
 |---|---|---|---|---|
-| **2D CNN** | Single frames | Spatial appearance (pose, scene) | ✅ Done | [`2d-cnn`](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn) |
-| **3D CNN** | Short clips (stacks of frames) | Spatial + short-range motion | 🔜 Planned | – |
-| **Transformer** | Single frames as patch tokens | Global spatial relations (self-attention) | ✅ Done | [`transformer`](https://github.com/anikagupta2403/DL-proj/tree/transformer) |
+| **ResNet-18** (ImageNet-pretrained) | 2D CNN | Single frames | Spatial appearance (pose, scene) | [`resnet`](https://github.com/anikagupta2403/DL-proj/tree/resnet) |
+| **Custom CNN** (from scratch) | 2D CNN | Single frames | Spatial appearance (pose, scene) | [`2d-cnn`](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn) |
+| **Crowd3DCNN** (from scratch) | 3D CNN | 4-frame clips | Spatial + short-range motion | [`3d-cnn`](https://github.com/anikagupta2403/DL-proj/tree/3d-cnn) |
+| **ViT-B/16** (ImageNet-pretrained) | Transformer | Single frames as patch tokens | Global spatial relations (self-attention) | [`transformer`](https://github.com/anikagupta2403/DL-proj/tree/transformer) |
 
-Each model lives on its own branch with its notebooks, trained weights and a detailed README. `main` holds this overview.
+Each model lives on its own branch with its executed notebook, trained weights (except the 343 MB ViT checkpoint, which is over GitHub's 100 MB limit), result figures and a detailed README. `main` holds this overview.
 
 ---
 
@@ -26,7 +27,7 @@ Surveillance systems produce far more footage than people can watch. Automatical
 
 ### Shared preprocessing
 
-All models use the same cleaned data and split, so their results can be compared directly:
+All models use the same cleaned data and the same split by source video:
 
 ```
 Raw Roboflow export (YOLOv8)            3,709 images
@@ -37,46 +38,45 @@ Raw Roboflow export (YOLOv8)            3,709 images
 Final dataset                           3,599 images (1,200 fall / 1,199 fight / 1,200 normal)
 ```
 
-The split is grouped by video because Roboflow's original split interleaves consecutive frames of the same clip, which leaks near-duplicates into validation.
+The split is grouped by video because Roboflow's original split interleaves consecutive frames of the same clip, which leaks near-duplicates into validation. The 3D CNN rebuilds this exact split (and checks the frame counts) before building clips, so it is tested on the same held-out videos.
 
 ---
 
 ## Models
 
-### 1. 2D CNN (done)
+### 1. 2D CNN: ResNet-18 ([`resnet`](https://github.com/anikagupta2403/DL-proj/tree/resnet))
 
-Frame-level classification. Two variants were trained on the same split:
+An ImageNet-pretrained ResNet-18 with its head replaced by `Dropout(0.3) → Linear(512, 3)`, fine-tuned end to end for 15 epochs. **Best model overall:** 6 errors out of 784 test frames, all normal frames predicted as fall. It detects every fall and fight.
 
-| Variant | Params | Test accuracy | Test macro-F1 |
-|---|---|---|---|
-| ResNet-18 (ImageNet-pretrained, fine-tuned) | 11.18 M | **0.992** | **0.994** |
-| Custom 4-block CNN (from scratch) | 1.17 M | 0.969 | 0.969 |
+### 2. 2D CNN: Custom CNN ([`2d-cnn`](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn))
 
-Both models detect every fall and fight in the test set (784 frames); all of their errors are false alarms on normal frames. Architecture, parameters, training curves and the full analysis are in the [`2d-cnn` branch README](https://github.com/anikagupta2403/DL-proj/tree/2d-cnn).
+A small VGG-style network (4 conv blocks, 32 → 256 channels, global average pooling) trained from scratch for 40 epochs, as a no-pretraining baseline. It reaches 0.969 macro-F1 with 10× fewer parameters than ResNet-18. Its 24 errors are all false alarms on normal frames.
 
-### 2. 3D CNN (planned)
+### 3. 3D CNN ([`3d-cnn`](https://github.com/anikagupta2403/DL-proj/tree/3d-cnn))
 
-The model convolves over both space and time on short clips of consecutive frames, so it can learn **motion** (collapsing, striking, scattering) instead of single-frame appearance.
+A small 3D CNN (3 Conv3d blocks, ~71k parameters) trained from scratch on clips of 4 consecutive frames, so it can learn **motion** and not only appearance. Clips are rebuilt from the Roboflow filenames (source video + frame number). Training clips overlap (stride 1, 884 clips) to get enough data; validation and test clips don't (stride 4), so each evaluation frame is counted once.
 
-### 3. Transformer (done)
+It is the weakest model (0.873 macro-F1 on 84 test clips). It catches every fall and fight, but all 10 errors are normal clips from fall videos (the person before or after the fall), so it mostly recognises the fall rooms rather than the motion. The frames are sparse (up to 20 frame numbers apart), so there is little real motion to learn, and validation has only 5 normal clips, which made model selection noisy.
 
-An ImageNet-pretrained **ViT-B/16** fine-tuned on the same split as the 2D CNNs. Each frame is cut into 196 patches of 16×16 pixels, and 12 self-attention layers relate every patch to every other.
+### 4. Transformer: ViT-B/16 ([`transformer`](https://github.com/anikagupta2403/DL-proj/tree/transformer))
 
-| Variant | Params | Test accuracy | Test macro-F1 |
-|---|---|---|---|
-| ViT-B/16 (ImageNet-pretrained, fine-tuned) | 85.80 M | 0.985 | 0.987 |
+An ImageNet-pretrained **ViT-B/16** fine-tuned for 15 epochs. Each frame is cut into 196 patches of 16×16 pixels, and 12 self-attention layers relate every patch to every other. It comes close to ResNet-18 but does not beat it, despite almost 8× more parameters. It has the fewest false alarms (3), but it is the only model that misses falls (9 falls predicted as normal).
 
-ViT comes close to ResNet-18 but does not beat it, despite almost 8× more parameters. It makes a different kind of error: it has the fewest false alarms (3), but it is the only model that misses falls (9 falls predicted as normal). Details are in the [`transformer` branch README](https://github.com/anikagupta2403/DL-proj/tree/transformer).
+### Results
 
-### Results so far
+| Model | Params | Pretrained | Test accuracy | Test macro-F1 | Fall recall | Normal recall |
+|---|---|---|---|---|---|---|
+| ResNet-18 | 11.18 M | ImageNet | **0.992** | **0.994** | 1.000 | 0.983 |
+| ViT-B/16 | 85.80 M | ImageNet | 0.985 | 0.987 | 0.969 | **0.992** |
+| Custom CNN | 1.17 M | No | 0.969 | 0.969 | 1.000 | 0.932 |
+| 3D CNN | ~0.07 M | No | 0.881 | 0.873 | 1.000 | 0.643 |
 
-| Model | Params | Test accuracy | Test macro-F1 | Fall recall | Normal recall |
-|---|---|---|---|---|---|
-| ResNet-18 | 11.18 M | **0.992** | **0.994** | 1.000 | 0.983 |
-| Custom CNN | 1.17 M | 0.969 | 0.969 | 1.000 | 0.932 |
-| ViT-B/16 | 85.80 M | 0.985 | 0.987 | 0.969 | **0.992** |
+Fight recall is 1.000 for all four models.
 
-All three use the same 784-frame test split, so differences of a few frames are within noise.
+- The three 2D models are scored on the same 784 test frames, so differences of a few frames are within noise.
+- The 3D CNN is scored on 84 non-overlapping clips (336 frames) from the same test videos. Only videos whose filenames give a video name and frame number can be turned into clips, so its numbers show the trend but are not an exact head-to-head.
+- **Pretraining matters more than model size or architecture:** both ImageNet-pretrained models are clearly ahead of both from-scratch models.
+- **Missed incidents are rare:** only the ViT misses abnormal events; all other errors are false alarms on normal frames.
 
 ---
 
@@ -84,17 +84,18 @@ All three use the same 784-frame test split, so differences of a few frames are 
 
 - **No crowd panic class.** The dataset covers falls and fights, so the task is framed as general abnormal behavior detection.
 - **Scene can give away the class.** Fall frames come mostly from a few indoor rooms and fight frames mostly from outdoor scenes, so a model can rely partly on the background. Near-perfect frame-level scores should be read with this in mind.
-- **Limited temporal data.** The dataset contains sampled frames, not full videos. Clip-based models (3D CNN, video transformers) need reconstructed frame sequences or the original source videos.
+- **Limited temporal data.** The dataset contains sampled frames, not full videos. Clip-based models need reconstructed frame sequences: the 3D CNN gets only short, irregular 4-frame clips, and 1,640 frames without a video name in their filename can't be used at all.
 
 ---
 
 ## Repository structure
 
 ```
-main      ← project overview (this README)
-2d-cnn    ← 2D CNN notebooks, trained weights, results, detailed README
-3d-cnn    ← (planned)
-transformer ← ViT-B/16 notebook, results, detailed README
+main        ← project overview (this README)
+resnet      ← ResNet-18 notebook, trained weights, results, detailed README
+2d-cnn      ← Custom CNN notebook, trained weights, results, detailed README
+3d-cnn      ← 3D CNN notebook, trained weights, results, detailed README
+transformer ← ViT-B/16 notebook, results, detailed README (weights too large for GitHub)
 ```
 
 All training runs on **Kaggle (GPU)**. Each branch's README explains how to reproduce its results.
