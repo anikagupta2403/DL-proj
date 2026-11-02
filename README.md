@@ -150,6 +150,16 @@ The run was repeated in a separate Kaggle session with the same seed and config.
 
 ---
 
+### Graphs
+
+The same set of graphs as the 3D CNN branch. The dashed line marks epoch 21, whose weights were kept for testing. The notebook logged only training loss per epoch (no validation loss) and only validation macro-F1 (no training F1), so those curves have a single line.
+
+| | |
+|---|---|
+| ![Custom CNN loss curve](results/custom_cnn_loss_curve.png) | ![Custom CNN accuracy curve](results/custom_cnn_accuracy_curve.png) |
+| ![Custom CNN macro-F1 curve](results/custom_cnn_macro_f1_curve.png) | ![Custom CNN test confusion matrix](results/custom_cnn_test_confusion_matrix.png) |
+| ![Custom CNN per-class test metrics](results/custom_cnn_test_class_metrics.png) | |
+
 ## 3. Comparison with the other models
 
 | | Custom CNN | ResNet-18 | ViT-B/16 | 3D CNN |
