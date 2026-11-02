@@ -1,16 +1,16 @@
-# Abnormal Crowd Behavior Detection with 2D CNNs
+# Abnormal Crowd Behavior Detection with a Custom 2D CNN
 
-Frame-level classification of surveillance images into **normal**, **fall** and **fight** using 2D convolutional neural networks.
+Frame-level classification of surveillance images into **normal**, **fall** and **fight** using a small 2D convolutional neural network trained from scratch.
 
-> Part of the [DL-proj](https://github.com/anikagupta2403/DL-proj) comparison of 2D CNN, 3D CNN and Transformer models. See `main` for the project overview.
+> Part of the [DL-proj](https://github.com/anikagupta2403/DL-proj) comparison of 2D CNN, 3D CNN and Transformer models. See `main` for the project overview, and [`resnet`](https://github.com/anikagupta2403/DL-proj/tree/resnet) for the pretrained ResNet-18 baseline.
 
 | | |
 |---|---|
-| Model 1 run (ResNet-18) | [`2d_cnn_resnet18.ipynb`](2d_cnn_resnet18.ipynb) → weights `best_resnet18.pt` |
-| Model 2 run (Custom CNN) | [`2d_cnn_custom.ipynb`](2d_cnn_custom.ipynb) → weights `best_custom_2d_cnn.pt` |
+| Run | [`2d_cnn_custom.ipynb`](2d_cnn_custom.ipynb) (executed on Kaggle, with outputs) |
+| Weights | [`best_custom_2d_cnn.pt`](best_custom_2d_cnn.pt) (4.7 MB, best epoch 21) |
 | Figures | [`results/`](results/) |
 
-Both runs were done on Kaggle (GPU) with the same data pipeline, split and seed.
+The run was done on Kaggle (GPU). ResNet-18 and the ViT use the same data pipeline, split and seed, so the results are directly comparable.
 
 ---
 
@@ -66,86 +66,17 @@ The 109 exact duplicates are frames Roboflow exported twice under different hash
 Videos differ in length, and whole videos must stay in one split, so the per-split class proportions are uneven even though the full dataset is balanced.
 
 ### Resizing, normalization and augmentation
-- **Resizing:** 224×224, the standard input size for ResNet-style CNNs. Roboflow's 640×640 is meant for YOLO detection.
-- **Normalization:** `ToTensor()` scales pixels to [0, 1], then ImageNet mean/std normalization is applied, which the pretrained ResNet expects.
+- **Resizing:** 224×224, the standard input size for image CNNs (and the one used by the ResNet-18 and ViT branches, for a fair comparison). Roboflow's 640×640 is meant for YOLO detection.
+- **Normalization:** `ToTensor()` scales pixels to [0, 1], then ImageNet mean/std normalization is applied. The from-scratch model does not need ImageNet statistics, but it keeps the pipeline identical to the pretrained models.
 - **Augmentation (training only):** `RandomResizedCrop(224, scale=(0.6, 1.0))`, `RandomHorizontalFlip`, `ColorJitter(0.3, 0.3, 0.3, 0.05)` (brightness, contrast, saturation, hue). Validation and test images are only resized and normalized.
 - **Mosaic augmentation was not used.** Mosaic stitches 4 images into one. That works for object detection, where every box keeps its own label, but in image classification the stitched image could contain normal, fall and fight at once and would have no single correct label.
 
 ---
 
-## 2. Implemented Models
-
-### Model 1: ResNet-18 (ImageNet-pretrained, fine-tuned)
+## 2. Model: Custom 2D CNN (trained from scratch)
 
 **Why we selected it**
-- The dataset is small (~2.1k training images). Transfer learning from ImageNet gives the model general visual features (edges, textures, human shapes and poses) that it would otherwise have to learn from very little data.
-- ResNet-18 is a well-understood baseline. At 11.2M parameters it is light enough to fine-tune in a few minutes on a Kaggle T4 GPU.
-- Its residual connections keep training stable when the whole network is fine-tuned.
-
-**How it works**
-- It is a deep 2D CNN made of residual blocks. Each block learns a residual function *F(x)* and outputs *F(x) + x*. This identity shortcut lets gradients pass straight through the block, which avoids the vanishing-gradient problem in deep networks.
-- **Structure:** a 7×7 convolution stem and max-pool, then 4 stages of 2 BasicBlocks each (64 → 128 → 256 → 512 channels, with resolution halved at each stage), then global average pooling and a fully connected layer.
-- **Our change:** we replaced the 1000-class ImageNet head with `Dropout(0.3) → Linear(512, 3)` and fine-tuned the whole network end to end.
-
-**Implementation**
-```python
-m = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
-m.fc = nn.Sequential(nn.Dropout(0.3), nn.Linear(m.fc.in_features, len(CLASSES)))
-```
-
-**Parameters used**
-
-| Hyperparameter | Value |
-|---|---|
-| Input size | 224 × 224 × 3 |
-| Trainable parameters | 11.18 M |
-| Epochs | 15 |
-| Batch size | 32 |
-| Optimizer | AdamW, weight decay 1e-4 |
-| Learning rate | 3e-4 (max), OneCycle schedule |
-| Loss | Cross-entropy, class-weighted, label smoothing 0.05 |
-| Precision | Mixed (AMP, fp16) |
-| Checkpoint selection | Best validation macro-F1 (epoch 9, val macro-F1 = 0.988) |
-| Seed | 42 |
-
-**Preliminary results**
-
-Training converged quickly: validation macro-F1 was 0.96 after the first epoch and peaked at 0.988 at epoch 9 ([curves](results/resnet18_training_curves.png)).
-
-Test set (784 images, from videos the model never saw):
-
-| Class | Precision | Recall | F1 | Support |
-|---|---|---|---|---|
-| fall | 0.980 | 1.000 | 0.990 | 288 |
-| fight | 1.000 | 1.000 | 1.000 | 141 |
-| normal | 1.000 | 0.983 | 0.991 | 355 |
-| **Macro avg** | **0.993** | **0.994** | **0.994** | 784 |
-| **Accuracy** | | | **0.992** | 784 |
-
-Confusion matrix (rows are the true class):
-
-| | pred fall | pred fight | pred normal |
-|---|---|---|---|
-| **fall** | 288 | 0 | 0 |
-| **fight** | 0 | 141 | 0 |
-| **normal** | 6 | 0 | 349 |
-
-![ResNet-18 confusion matrix](results/resnet18_confusion_matrix.png)
-
-Only 6 of 784 test frames are misclassified, all of them **normal → fall**. Every fall and fight frame is detected.
-
-Sample test predictions (green = correct, red = wrong):
-
-![ResNet-18 test predictions](results/resnet18_test_predictions.png)
-
-The one error in this sample (top row, 4th) is a person **standing** next to the mattress in a fall-dataset room. The model predicts *fall*, which suggests the room and the mattress, not the pose, drove the decision.
-
----
-
-### Model 2: Custom 2D CNN (trained from scratch)
-
-**Why we selected it**
-- It is a baseline with no pretraining. Comparing it with Model 1 shows how much of the performance comes from ImageNet transfer learning and how much the task can be learned from this dataset alone.
+- It is a baseline with no pretraining. Comparing it with the pretrained [ResNet-18](https://github.com/anikagupta2403/DL-proj/tree/resnet) shows how much of the performance comes from ImageNet transfer learning and how much the task can be learned from this dataset alone.
 - Each layer is simple enough to explain and analyze, and at about 1.17M parameters it is roughly 10× smaller than ResNet-18. That makes it a candidate for real-time use on edge surveillance hardware.
 
 **How it works**
@@ -180,11 +111,11 @@ class SmallCNN(nn.Module):
 | Loss | Cross-entropy, class-weighted, label smoothing 0.05 |
 | Precision | Mixed (AMP, fp16) |
 | Checkpoint selection | Best validation macro-F1 (epoch 21, val macro-F1 = 0.944) |
-| Data split and augmentation | Same as Model 1 |
+| Data split and augmentation | Same as ResNet-18 and ViT |
 
-**Preliminary results**
+**Results**
 
-Training was slower and noisier than for ResNet-18. Validation macro-F1 rose from 0.80 (epoch 1) to about 0.90 by epoch 10, then fluctuated between 0.85 and 0.94. It peaked at 0.944 at epoch 21, while training accuracy kept rising to 0.99 ([curves](results/custom_cnn_training_curves.png)).
+Training was slower and noisier than for the pretrained ResNet-18. Validation macro-F1 rose from 0.80 (epoch 1) to about 0.90 by epoch 10, then fluctuated between 0.85 and 0.94. It peaked at 0.944 at epoch 21, while training accuracy kept rising to 0.99 ([curves](results/custom_cnn_training_curves.png)).
 
 Test set (784 images):
 
@@ -208,64 +139,65 @@ Confusion matrix (rows are the true class):
 
 All 24 errors are **normal frames flagged as abnormal** (14 as fall, 10 as fight). Like ResNet-18, it never misses a fall or a fight.
 
-Sample test predictions (same 12 test images as Model 1; green = correct, red = wrong):
+Sample test predictions (same 12 test images as the ResNet-18 and ViT notebooks; green = correct, red = wrong):
 
 ![Custom CNN test predictions](results/custom_cnn_test_predictions.png)
 
 On this sample, the custom CNN makes the same predictions as ResNet-18, including the same normal → fall error on the standing person in the fall room.
 
+
 The run was repeated in a separate Kaggle session with the same seed and config. It reproduced every epoch's metrics and the test results exactly.
 
 ---
 
-### Model comparison
+## 3. Comparison with the other models
 
-| | ResNet-18 (pretrained) | Custom CNN (from scratch) |
-|---|---|---|
-| Parameters | 11.18 M | 1.17 M |
-| Weights file | 44.8 MB | 4.7 MB |
-| Epochs (best epoch) | 15 (9) | 40 (21) |
-| Best val macro-F1 | 0.988 | 0.944 |
-| **Test accuracy** | **0.992** | 0.969 |
-| **Test macro-F1** | **0.994** | 0.969 |
-| Test errors | 6 / 784 | 24 / 784 |
-| Recall on fall / fight | 1.000 / 1.000 | 1.000 / 1.000 |
-| Normal recall (false-alarm side) | 0.983 | 0.932 |
+| | Custom CNN | ResNet-18 | ViT-B/16 | 3D CNN |
+|---|---|---|---|---|
+| Input | 1 frame | 1 frame | 1 frame | 4-frame clip |
+| Parameters | 1.17 M | 11.18 M | 85.80 M | ~0.07 M |
+| Pretrained | No | ImageNet | ImageNet | No |
+| Epochs (best epoch) | 40 (21) | 15 (9) | 15 (8) | 25 (13) |
+| **Test accuracy** | 0.969 | **0.992** | 0.985 | 0.881 |
+| **Test macro-F1** | 0.969 | **0.994** | 0.987 | 0.873 |
+| Fall / fight recall | 1.000 / 1.000 | 1.000 / 1.000 | 0.969 / 1.000 | 1.000 / 1.000 |
+| Normal recall (false-alarm side) | 0.932 | 0.983 | **0.992** | 0.643 |
 
-- **Transfer learning helps, but by less than expected.** ImageNet pretraining gives about 2.5 points of macro-F1, 4× fewer errors, and much faster, more stable convergence. Still, a 1.17M-parameter network trained from scratch on ~2k images reaches 0.969. That suggests the classes are visually easy to separate in this dataset (see Limitations).
-- **Both models fail the same way.** Neither misses an abnormal event; all errors are false alarms on normal frames. For surveillance this is the safer kind of error.
-- **The custom CNN overfits more.** Its training accuracy reaches 0.99 while validation stays around 0.90–0.94, and its validation scores swing more from epoch to epoch.
+The three 2D models are scored on the same 784 test frames. The 3D CNN uses the same test videos but is scored on 84 clips from the videos whose filenames allow clips to be built.
+
+- **Transfer learning helps, but by less than expected.** The ImageNet-pretrained [ResNet-18](https://github.com/anikagupta2403/DL-proj/tree/resnet) scores about 2.5 points of macro-F1 higher, with 4× fewer errors (6 vs. 24) and much faster, more stable convergence. Still, a 1.17M-parameter network trained from scratch on ~2k images reaches 0.969. That suggests the classes are visually easy to separate in this dataset (see Limitations).
+- **It beats the other from-scratch model.** The [3D CNN](https://github.com/anikagupta2403/DL-proj/tree/3d-cnn) sees motion but has far less data and capacity, and scores 0.873.
+- **It fails the same way as ResNet-18.** It never misses an abnormal event; all errors are false alarms on normal frames. For surveillance this is the safer kind of error.
+- **It overfits.** Training accuracy reaches 0.99 while validation stays around 0.90–0.94, and validation scores swing from epoch to epoch.
 
 ---
 
-## 3. Evaluation Metrics
+## 4. Evaluation Metrics
 
-Both models use the same group-aware test split (784 images), which contains videos not seen during training or model selection.
+The model is evaluated on the group-aware test split (784 images, the same as ResNet-18 and the ViT), which contains videos not seen during training or model selection.
 
 - **Accuracy** is the fraction of correctly classified frames. It can hide weak performance on one class, especially because the test split's class mix is uneven (141 fight vs. 355 normal).
 - **Precision (per class)** is TP / (TP + FP): of the frames flagged as *fight*, how many really are fights. Low precision means false alarms.
 - **Recall (per class)** is TP / (TP + FN): of the real *fight* frames, how many the model caught. In surveillance, missing an incident (low recall on abnormal classes) usually costs more than a false alarm.
 - **F1-score** is the harmonic mean of precision and recall.
 - **Macro-F1** is the unweighted mean of the per-class F1 scores. It is the **main metric** and is also used to pick the best checkpoint, because it weights every class equally.
-- **Confusion matrix** shows which classes get confused with each other, e.g. normal → fall for both models.
+- **Confusion matrix** shows which classes get confused with each other, e.g. normal → fall here.
 
 ---
 
-## 4. Limitations
+## 5. Limitations
 
 - **The dataset has no crowd panic class.** It covers falls and fights, which are individual or small-group abnormal behaviors. The models detect *abnormal behavior* in general, and a dedicated crowd panic dataset (e.g. UMN, or the escape scenes in ShanghaiTech) would be needed for that specific task.
-- **Scene can give away the class.** Most fall frames come from a few indoor rooms and most fight frames from outdoor scenes, so a CNN can partly rely on the background instead of the behavior. The group split prevents identical clips from leaking across splits, but scenes still repeat across clips (e.g. the UR Fall room shared by many videos). Both models' shared error in the sample predictions, a person standing in a fall room predicted as *fall*, is an example of this. This may explain the near-perfect scores and why even the small from-scratch CNN does well. The scores should not be read as proof that the models generalize to new cameras.
+- **Scene can give away the class.** Most fall frames come from a few indoor rooms and most fight frames from outdoor scenes, so a CNN can partly rely on the background instead of the behavior. The group split prevents identical clips from leaking across splits, but scenes still repeat across clips (e.g. the UR Fall room shared by many videos). The error in the sample predictions, a person standing in a fall room predicted as *fall* (ResNet-18 makes the same one), is an example of this. This may explain why even a small from-scratch CNN does so well. The scores should not be read as proof that the models generalize to new cameras.
 - **Small, uneven test split.** The test split has only 141 fight frames, from a limited number of videos, so per-class scores can change by a few points with a different split.
 - **No temporal information.** A 2D CNN sees one frame at a time, while panic, fights and falls are defined by motion.
 
 ---
 
-## 5. How to Reproduce
+## 6. How to Reproduce
 
 1. Download the dataset from Roboflow (format: **YOLOv8**) and upload it as a Kaggle dataset.
-2. Open the notebook on Kaggle, set **Accelerator → GPU**, and point `DATA_ROOT` at the dataset:
-   - Model 1: `2d_cnn_resnet18.ipynb` (`MODEL = "resnet18"`, `EPOCHS = 15`, `LR = 3e-4`)
-   - Model 2: `2d_cnn_custom.ipynb` (`MODEL = "custom"`, `EPOCHS = 40`, `LR = 3e-4`)
-3. Click **Run All**. The best checkpoint is saved as `best.pt`.
+2. Open `2d_cnn_custom.ipynb` on Kaggle, set **Accelerator → GPU**, and point `DATA_ROOT` at the dataset. Settings: `MODEL = "custom"`, `EPOCHS = 40`, `LR = 3e-4`. Internet is not needed (no pretrained weights).
+3. Restart the session after changing the accelerator, then click **Run All**. The best checkpoint is saved as `best.pt`.
 
 Requirements: Python 3, PyTorch, torchvision, scikit-learn, pandas, matplotlib, Pillow, PyYAML (all preinstalled on Kaggle).
