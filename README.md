@@ -82,7 +82,6 @@ Fight recall is 1.000 for all four models.
 
 ## Known limitations of the data
 
-- **No crowd panic class.** The dataset covers falls and fights, so the task is framed as general abnormal behavior detection.
 - **Scene can give away the class.** Fall frames come mostly from a few indoor rooms and fight frames mostly from outdoor scenes, so a model can rely partly on the background. Near-perfect frame-level scores should be read with this in mind.
 - **Limited temporal data.** The dataset contains sampled frames, not full videos. Clip-based models need reconstructed frame sequences: the 3D CNN gets only short, irregular 4-frame clips, and 1,640 frames without a video name in their filename can't be used at all.
 
